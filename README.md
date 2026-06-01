@@ -1,4 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+This is the frontend for **APK Malware Analyzer**, built with the Next.js App Router, TypeScript, and Tailwind CSS.
+
+## Suggested Folder Structure
+
+```text
+frontend/
+├── app/
+├── components/
+│   ├── ui/
+│   └── layout/
+├── services/
+│   └── api/
+├── hooks/
+├── types/
+└── utils/
+```
+
+## Folder Purpose
+
+- `app/`: App Router entry point for pages, layouts, routes, and route-level UI.
+- `components/`: Reusable UI building blocks shared across the dashboard.
+- `components/ui/`: Small presentational elements such as buttons, badges, cards, and inputs.
+- `components/layout/`: Higher-level layout pieces such as sidebars, headers, nav bars, and shells.
+- `services/`: Business logic and external integrations.
+- `services/api/`: API wrappers for malware scanning, upload handling, analytics, and backend calls.
+- `hooks/`: Custom React hooks for shared client-side logic.
+- `types/`: Central TypeScript interfaces and type definitions.
+- `utils/`: Pure helper functions, constants, formatting helpers, and small shared utilities.
+
+This structure keeps the MVP clean now and makes it easy to scale into more features later.
+
+## Notes
+
+- The project already uses the Next.js App Router, so route files live in `app/`.
+- TypeScript and Tailwind CSS are already configured in the project dependencies.
 
 ## Getting Started
 
