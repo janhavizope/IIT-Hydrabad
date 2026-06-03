@@ -2,8 +2,15 @@ from fastapi import APIRouter, UploadFile, File
 from androguard.misc import AnalyzeAPK
 import shutil
 import os
+from pathlib import Path
+
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
 
 router = APIRouter()
+
+UPLOADS_DIR = Path(__file__).resolve().parents[2] / "uploads"
+
+UPLOADS_DIR = Path(__file__).resolve().parents[2] / "uploads"
 
 
 # Risk Score Calculation
@@ -65,6 +72,24 @@ async def upload_apk(file: UploadFile = File(...)):
     risk_score = calculate_risk_score(permissions)
     risk_level = get_risk_level(risk_score)
 
+@router.post("/upload-apk")
+async def upload_apk(file: UploadFile = File(...)):
+    filename = file.filename or ""
+
+    if not filename.lower().endswith(".apk"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only .apk files are allowed",
+        )
+
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+    safe_filename = Path(filename).name
+    saved_file_path = UPLOADS_DIR / safe_filename
+
+    file_content = await file.read()
+    saved_file_path.write_bytes(file_content)
+
     return {
         "package_name": package_name,
         "app_name": app_name,
@@ -72,4 +97,8 @@ async def upload_apk(file: UploadFile = File(...)):
         "permissions": permissions,
         "risk_score": risk_score,
         "risk_level": risk_level
+    }
+        "message": "APK uploaded successfully",
+        "filename": filename,
+        "saved_path": str(saved_file_path),
     }

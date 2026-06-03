@@ -14,3 +14,7 @@ app.include_router(upload_router, prefix="/api", tags=["Upload"])
 @app.get("/")
 def root():
     return {"message": "APK Malware Analyzer backend is running"}
+
+from app.routes.analyze import router as analyze_router
+
+app.include_router(analyze_router, prefix="/api", tags=["Analysis"])
