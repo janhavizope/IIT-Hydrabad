@@ -1,9 +1,7 @@
 import asyncio
 import sys
 import os
-
-# Add project root to sys.path
-project_root = r"C:\Users\janhavi\OneDrive\Documents\IIT Hyderabad Hackathon\IIT Project"
+project_root = r"C:\Users\janhavi\OneDrive\Documents\Projects\IIT Hyderabad Hackathon\IIT Project"
 sys.path.insert(0, project_root)
 
 from app.database.session import SessionLocal
