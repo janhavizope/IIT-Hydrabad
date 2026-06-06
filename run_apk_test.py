@@ -1,10 +1,3 @@
-"""
-CLI runner for full APK analysis (static + dynamic + verdict).
-
-Uses existing backend services directly — not AnalysisPipeline (pipeline module
-may be empty or static-only). Mirrors the API route flow and dynamic engines.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -28,11 +21,26 @@ from app.services.sandbox_controller import SandboxController
 from app.services.static.static_analysis_contract import build_canonical_from_pipeline_result
 
 
-def _run_static_analysis(apk_path: str) -> dict:
-    """Static analysis via APKParser, RiskEngine, and DeepStaticAnalyzer."""
-    apk_path = str(Path(apk_path).resolve())
-    if not os.path.isfile(apk_path):
-        raise FileNotFoundError(f"APK not found: {apk_path}")
+# =========================
+# PATH FIX (IMPORTANT)
+# =========================
+def resolve_apk_path(path: str) -> str:
+    p = Path(path).expanduser().resolve()
+
+    if p.exists():
+        return str(p)
+
+    raise FileNotFoundError(
+        f"APK NOT FOUND.\nGiven: {path}\nResolved: {p}\n"
+        "Fix: pass FULL absolute path OR move APK inside project folder."
+    )
+
+
+# =========================
+# STATIC ANALYSIS
+# =========================
+def run_static_analysis(apk_path: str) -> dict:
+    apk_path = resolve_apk_path(apk_path)
 
     file_bytes = Path(apk_path).read_bytes()
     apk_hash = hashlib.sha256(file_bytes).hexdigest()
@@ -42,8 +50,9 @@ def _run_static_analysis(apk_path: str) -> dict:
     deep_analyzer = DeepStaticAnalyzer()
 
     parsed = parser.parse(file_bytes)
-    if parsed is None:
-        raise RuntimeError("APK parsing returned None")
+
+    if not parsed:
+        raise RuntimeError("APK parsing failed")
 
     parsed.apk_path = apk_path
     parsed.metadata["apk_hash"] = apk_hash
@@ -62,246 +71,138 @@ def _run_static_analysis(apk_path: str) -> dict:
     }
 
 
-def _static_analysis_for_verdict(static_result: dict) -> dict:
-    """Canonical static payload for fusion / decision-trace engines."""
-    return build_canonical_from_pipeline_result(static_result)
-
-
-def _threat_intelligence_from_dynamic(dynamic_result: dict) -> dict:
-    """Flatten sandbox session output into threat_intelligence payload."""
+# =========================
+# THREAT INTELLIGENCE BUILDER
+# =========================
+def build_threat_intelligence(dynamic_result: dict) -> dict:
     log_analysis = dynamic_result.get("log_analysis") or {}
-    behavior = (
-        dynamic_result.get("behavior_risk")
-        or log_analysis.get("behavior_risk")
-        or {}
-    )
+    behavior = dynamic_result.get("behavior_risk") or log_analysis.get("behavior_risk") or {}
 
-    threat_intelligence = dict(behavior)
-    threat_intelligence.setdefault("package_name", dynamic_result.get("package_name") or "")
-    threat_intelligence["session_state"] = dynamic_result.get("session_state") or log_analysis.get(
-        "session_state", {}
-    )
-    if log_analysis.get("intelligence_summary"):
-        threat_intelligence["intelligence_summary"] = log_analysis["intelligence_summary"]
-    threat_intelligence["dynamic_session"] = {
-        "success": dynamic_result.get("success", False),
-        "status": dynamic_result.get("status"),
-        "session_id": dynamic_result.get("session_id"),
-        "failed_step": dynamic_result.get("failed_step"),
-        "error": dynamic_result.get("error"),
-        "error_type": dynamic_result.get("error_type"),
+    return {
+        **behavior,
+        "package_name": dynamic_result.get("package_name", ""),
+        "session_state": dynamic_result.get("session_state", {}),
+        "dynamic_session": {
+            "success": dynamic_result.get("success", False),
+            "status": dynamic_result.get("status"),
+            "error": dynamic_result.get("error"),
+        },
     }
-    return threat_intelligence
 
 
-def _empty_threat_intelligence(package_name: str = "", reason: str = "") -> dict:
+def empty_threat(package_name: str, reason: str) -> dict:
     return {
         "package_name": package_name,
         "risk_score": 0,
-        "risk_level": "LOW",
+        "risk_level": "SAFE",
         "attack_patterns": [],
         "evidence": [],
         "forensics": {"timeline": [], "iocs": {}},
-        "threat_classification": {},
-        "dynamic_session": {"success": False, "skipped": True, "reason": reason},
+        "dynamic_session": {"success": False, "reason": reason},
     }
 
 
-def run_full_analysis(
-    apk_path: str,
-    *,
-    enable_dynamic: bool = True,
-    dynamic_duration: int = 10,
-    username: str | None = None,
-    password: str | None = None,
-) -> dict:
-    """
-    Run static analysis, optional dynamic sandbox session, and fusion engines.
-    """
-    static_result = _run_static_analysis(apk_path)
-    static_for_verdict = _static_analysis_for_verdict(static_result)
+# =========================
+# FINAL PIPELINE
+# =========================
+def run_full_analysis(apk_path: str, enable_dynamic: bool = True, duration: int = 10) -> dict:
+    static_result = run_static_analysis(apk_path)
+    static_canonical = build_canonical_from_pipeline_result(static_result)
 
-    package_name = static_result.get("package_name") or ""
-    activities = static_result.get("main_activities") or []
-    activity = next(iter(activities)) if activities else ""
+    package_name = static_result.get("package_name", "")
+    activity = (static_result.get("main_activities") or [""])[0]
 
-    threat_intelligence: dict
-    dynamic_result: dict | None = None
+    sandbox = SandboxController()
+    dynamic_result = None
+    threat = None
 
     if enable_dynamic:
-        sandbox = SandboxController()
         dynamic_result = sandbox.run_dynamic_session(
-            apk_path=str(Path(apk_path).resolve()),
+            apk_path=resolve_apk_path(apk_path),
             package_name=package_name,
             activity=activity,
-            duration=dynamic_duration,
-            username=username,
-            password=password,
+            duration=duration,
         )
+
         if dynamic_result.get("success"):
-            threat_intelligence = _threat_intelligence_from_dynamic(dynamic_result)
+            threat = build_threat_intelligence(dynamic_result)
+
             events = (dynamic_result.get("log_analysis") or {}).get("events") or []
             validation = validate_attack_chains(events)
-            threat_intelligence = apply_to_threat_intelligence(
-                threat_intelligence,
+
+            threat = apply_to_threat_intelligence(
+                threat,
                 validation,
-                static_for_verdict,
+                static_canonical,
             )
         else:
-            threat_intelligence = _empty_threat_intelligence(
-                package_name,
-                reason=dynamic_result.get("error") or "dynamic analysis failed",
-            )
-            threat_intelligence["dynamic_session"] = {
-                "success": False,
-                "status": dynamic_result.get("status"),
-                "failed_step": dynamic_result.get("failed_step"),
-                "error": dynamic_result.get("error"),
-                "error_type": dynamic_result.get("error_type"),
-            }
+            threat = empty_threat(package_name, "dynamic failed")
     else:
-        threat_intelligence = _empty_threat_intelligence(package_name, reason="disabled by flag")
+        threat = empty_threat(package_name, "dynamic disabled")
 
-    final_verdict = build_final_verdict(threat_intelligence, static_for_verdict)
-    visualization_data = build_visualization_data(threat_intelligence)
+    final_verdict = build_final_verdict(threat, static_canonical)
+    visualization = build_visualization_data(threat)
+
     decision_trace = DecisionTraceEngine.build(
-        static_for_verdict,
-        threat_intelligence,
+        static_canonical,
+        threat,
         final_verdict,
     )
 
-    events = []
-    if dynamic_result and dynamic_result.get("success"):
-        events = (dynamic_result.get("log_analysis") or {}).get("events") or []
-
-    # Pass raw static_result so manifest permissions list is explicit (no inference)
-    assessment_static = {**static_result, **static_for_verdict}
-    malware_assessment = assess_apk_analysis(
-        assessment_static,
-        threat_intelligence=threat_intelligence,
-        events=events,
+    assessment = assess_apk_analysis(
+        static_result,
+        threat_intelligence=threat,
+        events=(dynamic_result or {}).get("log_analysis", {}).get("events", []),
         package_name=package_name,
     )
 
     return {
-        "apk_path": str(Path(apk_path).resolve()),
-        "malware_assessment": malware_assessment,
-        "static_analysis": static_result,
-        "static_for_verdict": static_for_verdict,
-        "dynamic_result": dynamic_result,
-        "threat_intelligence": threat_intelligence,
+        "apk_path": apk_path,
+        "malware_assessment": assessment,
+        "threat_intelligence": threat,
         "final_verdict": final_verdict,
-        "visualization_data": visualization_data,
+        "visualization": visualization,
         "decision_trace": decision_trace,
     }
 
 
-def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run full APK analysis pipeline")
-    parser.add_argument(
-        "apk_path",
-        nargs="?",
-        help="Path to the .apk file (prompted if omitted)",
-    )
-    parser.add_argument(
-        "--no-dynamic",
-        action="store_true",
-        help="Skip dynamic sandbox / logcat analysis",
-    )
-    parser.add_argument(
-        "--duration",
-        type=int,
-        default=60,
-        help="Logcat collection duration in seconds (default: 60)",
-    )
-    parser.add_argument(
-        "--username",
-        type=str,
-        default="admin",
-        help="Sample username for ADB login interaction",
-    )
-    parser.add_argument(
-        "--password",
-        type=str,
-        default="password",
-        help="Sample password for ADB login interaction",
-    )
-    return parser.parse_args()
+# =========================
+# CLI
+# =========================
+def main():
+    print("\n=== APK SECURITY ANALYZER ===\n")
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("apk_path", nargs="?")
+    parser.add_argument("--no-dynamic", action="store_true")
+    parser.add_argument("--duration", type=int, default=10)
+    args = parser.parse_args()
 
-def main() -> None:
-    print("\n=== APK ANALYSIS TEST RUNNER ===\n")
-
-    args = _parse_args()
-    apk_path = (args.apk_path or "").strip()
-    if not apk_path:
-        apk_path = input("Enter APK path: ").strip()
-
-    if not apk_path:
-        print("No APK path provided. Exiting.")
-        sys.exit(1)
-
-    print(f"\nAPK: {apk_path}")
-    print(f"Dynamic analysis: {'off' if args.no_dynamic else 'on'}")
-    print("\nRunning analysis... please wait\n")
+    apk_path = args.apk_path or input("Enter APK path: ").strip()
 
     try:
         result = run_full_analysis(
             apk_path,
             enable_dynamic=not args.no_dynamic,
-            dynamic_duration=args.duration,
-            username=args.username,
-            password=args.password,
+            duration=args.duration,
         )
-    except Exception as exc:
-        print("\nERROR OCCURRED:\n", str(exc))
+    except Exception as e:
+        print("\nERROR:\n", str(e))
         traceback.print_exc()
         sys.exit(1)
 
-    threat = result.get("threat_intelligence", {})
-    forensics = threat.get("forensics", {})
-    behavior = result.get("threat_intelligence", {}).get("behavior_risk", {})
+    assessment = result["malware_assessment"]
 
-    print("\n================ MALWARE ASSESSMENT (STRICT JSON) ================\n")
-    print(json.dumps(result.get("malware_assessment", {}), indent=2, default=str))
+    print("\n================ FINAL RESULT ================\n")
+    print(json.dumps(assessment, indent=2, default=str))
 
-    print("\n================ DETAILED DYNAMIC REPORT ================\n")
-    
-    print("--- Fused Final Risk Score ---")
-    fused_score = result.get("malware_assessment", {}).get("risk_score", 0)
-    print(f"Score: {fused_score}/100")
-    print(f"Level: {threat.get('risk_level', 'LOW')}")
-    
-    print("\n--- Suspicious Actions Detected ---")
-    patterns = threat.get("attack_patterns", [])
-    if patterns:
-        for p in patterns:
-            print(f" - {p}")
-    else:
-        print(" - None")
-        
-    print("\n--- Evidence Used for Classification ---")
-    evidence = threat.get("evidence", [])
-    if evidence:
-        for e in evidence:
-            print(f" - {e}")
-    else:
-        print(" - None")
+    print("\n================ SUMMARY ================\n")
+    print("Risk Score:", assessment.get("risk_score", 0))
+    print("Classification:", assessment.get("classification", "UNKNOWN"))
 
-    print("\n--- IOC Summary ---")
-    iocs = forensics.get("iocs", {})
-    print(json.dumps(iocs, indent=2, default=str))
-
-    print("\n--- Runtime Timeline ---")
-    timeline = forensics.get("timeline", [])
-    if timeline:
-        for t in timeline:
-            print(f"[{t.get('time')}] {t.get('event_type').upper()}: {t.get('summary')}")
-    else:
-        print("No runtime events recorded.")
-
-    print("\n========================================\n")
+    print("\n================ DONE ================\n")
 
 
 if __name__ == "__main__":
     main()
+    
