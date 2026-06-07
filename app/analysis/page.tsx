@@ -12,381 +12,390 @@ import {
   ShieldX,
   Sparkles,
   TriangleAlert,
-  LoaderCircle,
-  FileCode2
+  Download,
+  FileText,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-type RiskLevel = "Green" | "Yellow" | "Orange" | "Red";
+// ─── Types ───────────────────────────────────────────────────────────────────
 
-function getRiskBand(score: number): RiskLevel {
-  if (score < 25) return "Green";
-  if (score < 50) return "Yellow";
-  if (score < 75) return "Orange";
-  return "Red";
+interface PermissionsData {
+  all: string[];
+  dangerous: string[];
 }
 
-function getRiskColor(score: number) {
-  switch (getRiskBand(score)) {
-    case "Green": return "text-emerald-200";
-    case "Yellow": return "text-yellow-200";
-    case "Orange": return "text-orange-200";
-    case "Red": return "text-red-200";
-  }
+interface SuspiciousIndicators {
+  suspicious_apis: string[];
+  hardcoded_urls: string[];
+  crypto_usage: string[];
+  obfuscation_signs: string[];
 }
 
-function getRiskBadge(score: number) {
-  switch (getRiskBand(score)) {
-    case "Green": return "border-emerald-400/20 bg-emerald-400/10 text-emerald-200";
-    case "Yellow": return "border-yellow-400/20 bg-yellow-400/10 text-yellow-200";
-    case "Orange": return "border-orange-400/20 bg-orange-400/10 text-orange-200";
-    case "Red": return "border-red-400/20 bg-red-400/10 text-red-200";
-  }
+interface StaticAnalysis {
+  package_name: string;
+  static_risk_score: number;
+  permissions: PermissionsData;
+  suspicious_indicators: SuspiciousIndicators;
+  summary: string[];
 }
 
-function getRiskGradient(score: number) {
-  switch (getRiskBand(score)) {
-    case "Green": return "from-emerald-400 via-cyan-400 to-sky-500";
-    case "Yellow": return "from-yellow-400 via-amber-400 to-orange-500";
-    case "Orange": return "from-orange-400 via-orange-500 to-red-500";
-    case "Red": return "from-red-400 via-rose-500 to-red-600";
-  }
+interface FinalVerdict {
+  verdict: string;
+  final_risk_score: number;
+  confidence: number;
+  reasoning: string[];
 }
 
-function getRiskIcon(score: number) {
-  switch (getRiskBand(score)) {
-    case "Green": return ShieldCheck;
-    case "Yellow": return TriangleAlert;
-    case "Orange": return ShieldAlert;
-    case "Red": return ShieldX;
-  }
+interface DynamicAnalysis {
+  status: string;
+  error?: string;
 }
 
-function AnalysisContent() {
-  const searchParams = useSearchParams();
-  const report_id = searchParams.get("report_id");
-  
-  const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
+interface ReportData {
+  final_verdict: FinalVerdict;
+  static_analysis: StaticAnalysis;
+  dynamic_analysis: DynamicAnalysis;
+  ai_summary: string | null;
+  package_name?: string;
+  apk_hash?: string;
+  id: string;
+}
 
-  useEffect(() => {
-    if (!report_id) {
-      setError("No report ID specified in URL parameter.");
-      setLoading(false);
-      return;
-    }
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-    const pollAnalysis = () => {
-        fetch(`http://localhost:8000/api/analyze-apk/${report_id}`)
-          .then((res) => {
-            if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-            return res.json();
-          })
-          .then((json) => {
-            if (json.status === "failed") {
-              setError(json.error_message || "Analysis pipeline failed.");
-              setLoading(false);
-            } else if (json.status === "PENDING") {
-              setTimeout(pollAnalysis, 5000);
-            } else {
-              setData(json);
-              setLoading(false);
-            }
-          })
-          .catch((err) => {
-            console.error(err);
-            setError("Network error fetching analysis. Ensure backend is running.");
-            setLoading(false);
-          });
-    };
-    
-    pollAnalysis();
-  }, [report_id]);
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-  if (loading) {
-    return (
-      <div className="flex h-[60vh] flex-col items-center justify-center gap-5 text-slate-300">
-        <LoaderCircle className="h-12 w-12 animate-spin text-cyan-400" />
-        <div className="text-center">
-            <p className="text-lg font-medium text-white">Analyzing APK...</p>
-            <p className="mt-2 text-sm text-slate-400">Static and dynamic analysis may take up to 30 seconds.</p>
-        </div>
-      </div>
-    );
+function riskColor(score: number) {
+  if (score >= 75) return "text-red-400";
+  if (score >= 50) return "text-orange-400";
+  if (score >= 25) return "text-yellow-400";
+  return "text-green-400";
+}
+
+function riskLabel(score: number) {
+  if (score >= 75) return "CRITICAL";
+  if (score >= 50) return "HIGH";
+  if (score >= 25) return "MEDIUM";
+  return "LOW";
+}
+
+function verdictIcon(verdict: string) {
+  const v = verdict?.toUpperCase();
+  if (v === "MALWARE" || v === "MALICIOUS")
+    return <ShieldX className="w-6 h-6 text-red-400" />;
+  if (v === "SUSPICIOUS")
+    return <ShieldAlert className="w-6 h-6 text-yellow-400" />;
+  return <ShieldCheck className="w-6 h-6 text-green-400" />;
+}
+
+// ─── Download helper ──────────────────────────────────────────────────────────
+
+function downloadReport(report: ReportData) {
+  const verdict = report.final_verdict ?? {};
+  const sta = report.static_analysis ?? {};
+  const pkg = sta.package_name ?? report.package_name ?? "Unknown";
+  const hash = report.apk_hash ?? "N/A";
+  const score = verdict.final_risk_score ?? 0;
+  const verdictStr = verdict.verdict ?? "Unknown";
+  const confidence = verdict.confidence ?? "N/A";
+
+  // Use ai_summary if available, otherwise build a basic text report
+  let content: string;
+
+  if (report.ai_summary) {
+    content =
+      `APK MALWARE ANALYSIS REPORT\n` +
+      `Generated: ${new Date().toLocaleString()}\n` +
+      `Report ID: ${report.id}\n` +
+      `APK Hash : ${hash}\n` +
+      `${"=".repeat(60)}\n\n` +
+      report.ai_summary;
+  } else {
+    const dangerPerms = sta.permissions?.dangerous ?? [];
+    const allPerms = sta.permissions?.all ?? [];
+    const susApis =
+      sta.suspicious_indicators?.suspicious_apis ?? [];
+
+    content =
+      `APK MALWARE ANALYSIS REPORT\n` +
+      `Generated: ${new Date().toLocaleString()}\n` +
+      `Report ID: ${report.id}\n` +
+      `APK Hash : ${hash}\n` +
+      `${"=".repeat(60)}\n\n` +
+      `PACKAGE NAME\n${pkg}\n\n` +
+      `VERDICT\nVerdict    : ${verdictStr}\nRisk Score : ${score}/100 — ${riskLabel(score)} RISK\nConfidence : ${confidence}\n\n` +
+      `PERMISSIONS\nTotal      : ${allPerms.length}\nDangerous  : ${dangerPerms.length}\n` +
+      (dangerPerms.length
+        ? dangerPerms.map((p) => `  WARNING: ${p}`).join("\n") + "\n"
+        : "") +
+      `\nSUSPICIOUS API CALLS\n` +
+      (susApis.length
+        ? susApis.map((a) => `  - ${a}`).join("\n")
+        : "None detected.") +
+      `\n\nANALYSIS SUMMARY\n` +
+      (sta.summary ?? []).join("\n");
   }
 
-  if (error || !data) {
-    return (
-      <div className="flex h-[60vh] flex-col items-center justify-center gap-4 text-red-400">
-        <ShieldX className="h-12 w-12" />
-        <p className="text-lg font-medium">{error}</p>
-      </div>
-    );
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `malware-report-${pkg}-${Date.now()}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── AI Summary Section ───────────────────────────────────────────────────────
+
+function AISummarySection({ summary }: { summary: string }) {
+  // Parse sections from the formatted string
+  const sep = "=".repeat(60);
+  const rawSections = summary.split(sep).filter((s) => s.trim());
+
+  const sections: { title: string; body: string }[] = [];
+  for (let i = 0; i < rawSections.length; i++) {
+    const lines = rawSections[i].trim().split("\n");
+    const title = lines[0]?.trim() ?? "";
+    const body = lines.slice(1).join("\n").trim();
+    if (title) sections.push({ title, body });
   }
 
-  const riskScore = data.final_verdict?.final_risk_score || 0;
-  const verdict = data.final_verdict?.verdict || "UNKNOWN";
-  const confidence = data.final_verdict?.confidence || 0;
-  const RiskIcon = getRiskIcon(riskScore);
-  const riskBand = getRiskBand(riskScore);
-
-  const apkInformation = [
-    { label: "Report ID", value: report_id },
-    { label: "Package Name", value: data.package_name || "Unknown" },
-    { label: "Hash (SHA256)", value: data.apk_hash || "Unknown" },
-    { label: "Veridct", value: verdict },
-    { label: "Confidence", value: `${Math.round(confidence * 100)}%` },
-    { label: "Analysis Engine", value: "Static + Sandbox Fusion" },
-  ];
-
-  const dangerousPerms = data.static_analysis?.permissions?.dangerous || [];
-  const allPerms = data.permissions || [];
-  
-  const mappedPermissions = allPerms.map((p: string) => {
-      const isDangerous = dangerousPerms.includes(p) || p.includes("SMS") || p.includes("CONTACTS") || p.includes("LOCATION");
-      return {
-          name: p,
-          status: "Granted",
-          risk: isDangerous ? "Red" : "Green",
-          note: isDangerous ? "Flagged as high-risk permission by static engine." : "Standard system permission."
-      };
-  });
-
-  const suspiciousIndicators = [];
-  
-  const iocs = data.static_analysis?.extracted_iocs || {};
-  if (iocs.urls?.length > 0 || iocs.ips?.length > 0 || iocs.apikeys?.length > 0) {
-      suspiciousIndicators.push({
-          title: "Hardcoded IOCs Detected",
-          severity: "Red" as RiskLevel,
-          icon: Globe2,
-          text: `Found ${iocs.urls?.length || 0} URLs, ${iocs.ips?.length || 0} IPs, and ${iocs.apikeys?.length || 0} API keys hardcoded in the code.`
-      });
-  }
-
-  if (data.dynamic_analysis?.behavior_risk?.attack_patterns?.length > 0 || data.dynamic_analysis?.attack_patterns?.length > 0) {
-      const p = data.dynamic_analysis.behavior_risk?.attack_patterns || data.dynamic_analysis.attack_patterns;
-      suspiciousIndicators.push({
-          title: "Suspicious Runtime Behaviors",
-          severity: "Red" as RiskLevel,
-          icon: ShieldAlert,
-          text: `Sandbox automation detected: ${p.join(", ")}`
-      });
-  }
-
-  if (data.static_analysis?.attack_patterns?.length > 0) {
-       suspiciousIndicators.push({
-          title: "Attack Patterns Detected",
-          severity: "Orange" as RiskLevel,
-          icon: FileCode2,
-          text: `Static analysis detected: ${data.static_analysis.attack_patterns.join(", ")}`
-      });
-  }
-
-  if (dangerousPerms.length > 0) {
-      suspiciousIndicators.push({
-          title: "Dangerous Permission Profile",
-          severity: "Orange" as RiskLevel,
-          icon: TriangleAlert,
-          text: `Application requests ${dangerousPerms.length} permissions known to be abused by malware.`
-      });
-  }
-
-  if (suspiciousIndicators.length === 0) {
-      suspiciousIndicators.push({
-          title: "No Major Indicators",
-          severity: "Green" as RiskLevel,
-          icon: ShieldCheck,
-          text: "The analysis engine did not detect any immediate attack patterns or malicious behaviors."
-      });
-  }
-
-  const aiSummary = data.final_verdict?.reasoning || [
-      "Analysis complete. See dashboard for specific indicators."
-  ];
+  const colorMap: Record<string, string> = {
+    "EXECUTIVE SUMMARY": "border-blue-500/40 bg-blue-950/20",
+    "RISK SCORE": "border-yellow-500/40 bg-yellow-950/20",
+    VERDICT: "border-green-500/40 bg-green-950/20",
+    "PACKAGE INFORMATION": "border-cyan-500/40 bg-cyan-950/20",
+    "SUSPICIOUS FINDINGS": "border-orange-500/40 bg-orange-950/20",
+    "PERMISSION ANALYSIS SUMMARY": "border-purple-500/40 bg-purple-950/20",
+    "SECURITY RECOMMENDATIONS": "border-red-500/40 bg-red-950/20",
+  };
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 px-4 py-12 sm:px-6 lg:px-8">
-      <section className="rounded-[2rem] border border-cyan-400/10 bg-white/[0.04] p-6 shadow-[0_18px_70px_rgba(2,6,23,0.34)] backdrop-blur-xl">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="space-y-3">
-            <p className="text-xs uppercase tracking-[0.34em] text-cyan-300/75">Analysis Report</p>
-            <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">APK Analysis Results</h1>
-            <p className="max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
-              VirusTotal-style malware intelligence dashboard with package metadata, permission assessment, risk scoring, suspicious indicators, and analyst recommendations.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.24em] text-slate-400">
-            <span className={`rounded-full border px-3 py-1 ${getRiskBadge(riskScore)}`}>{verdict}</span>
-          </div>
-        </div>
-      </section>
+    <div className="mt-8 space-y-4">
+      <div className="flex items-center gap-2 mb-4">
+        <Sparkles className="w-5 h-5 text-blue-400" />
+        <h2 className="text-lg font-semibold text-white">
+          AI Generated Malware Analysis Report
+        </h2>
+        <span className="text-xs bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full">
+          AI GENERATED
+        </span>
+      </div>
 
-      <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <article className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 shadow-[0_18px_70px_rgba(2,6,23,0.34)] backdrop-blur-xl">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.28em] text-cyan-300/75">APK Information</p>
-              <h2 className="mt-2 text-2xl font-semibold text-white">Sample metadata</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {sections.map(({ title, body }, idx) => {
+          const isFullWidth =
+            title === "EXECUTIVE SUMMARY" ||
+            title === "SECURITY RECOMMENDATIONS";
+          const colorClass =
+            colorMap[title] ?? "border-zinc-700/40 bg-zinc-900/30";
+
+          return (
+            <div
+              key={idx}
+              className={`rounded-xl border p-4 ${colorClass} ${
+                isFullWidth ? "md:col-span-2" : ""
+              }`}
+            >
+              <h3 className="text-xs font-bold tracking-widest text-zinc-400 mb-3 uppercase">
+                {title}
+              </h3>
+              <pre className="text-sm text-zinc-200 whitespace-pre-wrap font-sans leading-relaxed">
+                {body}
+              </pre>
             </div>
-            <div className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-slate-300">
-              <Fingerprint className="mr-2 inline h-4 w-4" aria-hidden="true" />
-              Analyzed Sample
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            {apkInformation.map((item) => (
-              <div key={item.label} className="rounded-2xl border border-white/10 bg-slate-950/40 p-4 transition duration-300 hover:-translate-y-0.5 hover:border-cyan-400/20 hover:bg-white/[0.05]">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-400">{item.label}</p>
-                <p className="mt-2 break-words text-sm font-medium text-white">{item.value}</p>
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 shadow-[0_18px_70px_rgba(2,6,23,0.34)] backdrop-blur-xl">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.28em] text-cyan-300/75">Risk Score</p>
-              <h2 className="mt-2 text-2xl font-semibold text-white">0–100 meter</h2>
-            </div>
-            <span className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] ${getRiskBadge(riskScore)}`}>
-              {riskBand}
-            </span>
-          </div>
-
-          <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-slate-950/40 p-5">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <p className="text-sm uppercase tracking-[0.28em] text-slate-400">Risk Score</p>
-                <div className={`mt-2 text-5xl font-semibold tracking-tight ${getRiskColor(riskScore)}`}>{riskScore}</div>
-              </div>
-              <div className={`flex h-14 w-14 items-center justify-center rounded-2xl border ${getRiskBadge(riskScore)}`}>
-                <RiskIcon className="h-7 w-7" aria-hidden="true" />
-              </div>
-            </div>
-
-            <div className="mt-5 h-4 overflow-hidden rounded-full bg-white/5">
-              <div
-                className={`h-full rounded-full bg-gradient-to-r ${getRiskGradient(riskScore)} shadow-[0_0_25px_rgba(239,68,68,0.18)]`}
-                style={{ width: `${riskScore}%` }}
-              />
-            </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Verdict</p>
-                <p className={`mt-2 text-lg font-semibold ${getRiskColor(riskScore)}`}>{verdict}</p>
-              </div>
-            </div>
-          </div>
-        </article>
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <article className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 shadow-[0_18px_70px_rgba(2,6,23,0.34)] backdrop-blur-xl">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.28em] text-cyan-300/75">Permissions Analysis</p>
-              <h2 className="mt-2 text-2xl font-semibold text-white">Manifest Permissions</h2>
-            </div>
-            <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-slate-300">
-              {mappedPermissions.length} permissions
-            </span>
-          </div>
-
-          <div className="mt-6 overflow-hidden rounded-[1.5rem] border border-white/10 max-h-96 overflow-y-auto">
-            <table className="min-w-full divide-y divide-white/10 text-left text-sm">
-              <thead className="bg-white/[0.03] text-slate-300">
-                <tr>
-                  <th className="px-4 py-4 font-medium uppercase tracking-[0.24em]">Permission</th>
-                  <th className="px-4 py-4 font-medium uppercase tracking-[0.24em]">Risk</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/10 text-slate-200">
-                {mappedPermissions.map((permission: any, idx: number) => (
-                  <tr key={idx} className="bg-transparent transition duration-300 hover:bg-white/[0.04]">
-                    <td className="px-4 py-4 font-mono text-xs text-white sm:text-sm">{permission.name.replace('android.permission.', '')}</td>
-                    <td className="px-4 py-4">
-                      <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] ${getRiskBadge(permission.risk === "Green" ? 10 : 90)}`}>
-                        {permission.risk}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {mappedPermissions.length === 0 && (
-                  <tr><td colSpan={2} className="px-4 py-4 text-center text-slate-400">No permissions found</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </article>
-
-        <article className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 shadow-[0_18px_70px_rgba(2,6,23,0.34)] backdrop-blur-xl">
-          <div>
-            <p className="text-xs uppercase tracking-[0.28em] text-cyan-300/75">Decision Trace Summary</p>
-            <h2 className="mt-2 text-2xl font-semibold text-white">Fusion Engine Output</h2>
-          </div>
-
-          <div className="mt-6 space-y-4">
-            {aiSummary.map((paragraph: string, index: number) => (
-              <div key={index} className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
-                <div className="flex items-start gap-3">
-                  <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 via-sky-400 to-blue-500 text-sm font-semibold text-slate-950 shadow-[0_0_18px_rgba(34,211,238,0.2)]">
-                    {index + 1}
-                  </div>
-                  <p className="text-sm leading-6 text-slate-200">{paragraph}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </article>
-      </section>
-
-      <section className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 shadow-[0_18px_70px_rgba(2,6,23,0.34)] backdrop-blur-xl">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.28em] text-cyan-300/75">Suspicious Indicators</p>
-            <h2 className="mt-2 text-2xl font-semibold text-white">Top findings</h2>
-          </div>
-        </div>
-
-        <div className="mt-6 grid gap-3">
-          {suspiciousIndicators.map((indicator, idx) => {
-            const Icon = indicator.icon;
-            return (
-              <div key={idx} className="rounded-2xl border border-white/10 bg-slate-950/40 p-4 transition duration-300 hover:-translate-y-0.5 hover:border-cyan-400/20 hover:bg-white/[0.05]">
-                <div className="flex items-start gap-4">
-                  <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border ${getRiskBadge(indicator.severity === "Green" ? 10 : indicator.severity === "Yellow" ? 35 : indicator.severity === "Orange" ? 60 : 90)}`}>
-                    <Icon className="h-5 w-5" aria-hidden="true" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <h3 className="text-sm font-semibold text-white">{indicator.title}</h3>
-                    </div>
-                    <p className="mt-2 text-sm leading-6 text-slate-300">{indicator.text}</p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-export default function AnalysisPage() {
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
+function AnalysisContent() {
+  const searchParams = useSearchParams();
+  const reportId = searchParams.get("report_id");
+
+  const [report, setReport] = useState<ReportData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [polling, setPolling] = useState(false);
+
+  useEffect(() => {
+    if (!reportId) {
+      setError("No report ID provided.");
+      setLoading(false);
+      return;
+    }
+
+    const fetchReport = async () => {
+      try {
+        const res = await fetch(
+          `${API_BASE}/api/analyze-apk/${reportId}`
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        if (data.status === "PENDING") {
+          setPolling(true);
+          setTimeout(fetchReport, 5000);
+          return;
+        }
+
+        setPolling(false);
+        setReport(data);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Failed to load report.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReport();
+  }, [reportId]);
+
+  if (loading || polling) {
     return (
-        <AppShell>
-            <Suspense fallback={
-                <div className="flex h-screen items-center justify-center">
-                    <LoaderCircle className="h-10 w-10 animate-spin text-cyan-400" />
-                </div>
-            }>
-                <AnalysisContent />
-            </Suspense>
-        </AppShell>
+      <AppShell>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-zinc-400 text-sm">
+            {polling ? "Analysis in progress… checking every 5s" : "Loading report…"}
+          </p>
+        </div>
+      </AppShell>
     );
+  }
+
+  if (error || !report) {
+    return (
+      <AppShell>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
+          <AlertTriangle className="w-10 h-10 text-red-400" />
+          <p className="text-zinc-300">{error ?? "Report not found."}</p>
+        </div>
+      </AppShell>
+    );
+  }
+
+  const verdict = report.final_verdict ?? {};
+  const sta = report.static_analysis ?? {};
+  const score = verdict.final_risk_score ?? 0;
+  const verdictStr = verdict.verdict ?? "Unknown";
+  const pkg = sta.package_name ?? report.package_name ?? "Unknown";
+  const dangerPerms = sta.permissions?.dangerous ?? [];
+  const allPerms = sta.permissions?.all ?? [];
+  const susApis = sta.suspicious_indicators?.suspicious_apis ?? [];
+
+  return (
+    <AppShell>
+      <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+
+        {/* Header + Download button */}
+        <div className="flex items-start justify-between flex-wrap gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              {verdictIcon(verdictStr)}
+              <h1 className="text-2xl font-bold text-white">{pkg}</h1>
+            </div>
+            <p className="text-zinc-500 text-sm font-mono">{report.apk_hash}</p>
+          </div>
+
+          <Button
+            onClick={() => downloadReport(report)}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white"
+          >
+            <Download className="w-4 h-4" />
+            Download Report
+          </Button>
+        </div>
+
+        {/* Risk + Verdict cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Risk Score</p>
+            <p className={`text-3xl font-bold ${riskColor(score)}`}>{score}/100</p>
+            <p className={`text-sm mt-1 ${riskColor(score)}`}>{riskLabel(score)} RISK</p>
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Verdict</p>
+            <div className="flex items-center gap-2 mt-1">
+              {verdictIcon(verdictStr)}
+              <p className="text-xl font-bold text-white">{verdictStr}</p>
+            </div>
+            <p className="text-xs text-zinc-500 mt-2">
+              Confidence: {verdict.confidence ?? "N/A"}
+            </p>
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <p className="text-xs text-zinc-500 uppercase tracking-widest mb-1">Permissions</p>
+            <p className="text-3xl font-bold text-white">{allPerms.length}</p>
+            <p className="text-sm text-red-400 mt-1">{dangerPerms.length} dangerous</p>
+          </div>
+        </div>
+
+        {/* Permissions */}
+        {dangerPerms.length > 0 && (
+          <div className="bg-zinc-900 border border-red-900/40 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <TriangleAlert className="w-4 h-4 text-red-400" />
+              <h2 className="text-sm font-semibold text-red-300">Dangerous Permissions</h2>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {dangerPerms.map((p) => (
+                <span
+                  key={p}
+                  className="text-xs bg-red-950/40 text-red-300 border border-red-800/40 px-2 py-1 rounded-md font-mono"
+                >
+                  {p.replace("android.permission.", "")}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Suspicious APIs */}
+        {susApis.length > 0 && (
+          <div className="bg-zinc-900 border border-orange-900/40 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <ShieldAlert className="w-4 h-4 text-orange-400" />
+              <h2 className="text-sm font-semibold text-orange-300">Suspicious API Calls</h2>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {susApis.map((a) => (
+                <span
+                  key={a}
+                  className="text-xs bg-orange-950/40 text-orange-300 border border-orange-800/40 px-2 py-1 rounded-md font-mono"
+                >
+                  {a}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* AI Summary */}
+        {report.ai_summary ? (
+          <AISummarySection summary={report.ai_summary} />
+        ) : (
+          <div className="flex items-center gap-2 text-zinc-500 text-sm mt-4">
+            <FileText className="w-4 h-4" />
+            <span>AI summary not available for this report.</span>
+          </div>
+        )}
+
+      </div>
+    </AppShell>
+  );
+}
+
+export default function AnalysisPage() {
+  return (
+    <Suspense fallback={<div className="text-zinc-400 p-8">Loading…</div>}>
+      <AnalysisContent />
+    </Suspense>
+  );
 }

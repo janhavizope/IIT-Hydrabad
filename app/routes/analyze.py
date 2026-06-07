@@ -28,7 +28,7 @@ def create_safe_error_response(message: str):
     }
 
 
-@router.get("/analyze-apk/{filename}")
+@router.get("/analyze-apk-file/{filename}")
 def analyze_apk(filename: str):
     apk_path = UPLOADS_DIR / Path(filename).name
 
