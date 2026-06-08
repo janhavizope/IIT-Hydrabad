@@ -1,10 +1,12 @@
 "use client";
 
-import { ArrowRight, Play } from "lucide-react";
+import { useState } from "react";
+import { ArrowRight, Play, X } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import HolographicVisual from "./HolographicVisual";
+import DemoWidget from "@/components/DemoWidget";
 
 const stats = [
   { value: "48K+", label: "APKs analyzed" },
@@ -14,6 +16,7 @@ const stats = [
 
 export default function Hero() {
   const reduced = useReducedMotion();
+  const [showDemo, setShowDemo] = useState(false);
 
   return (
     <section className="relative overflow-hidden pt-[72px]">
@@ -43,7 +46,7 @@ export default function Hero() {
               Upload APK
               <ArrowRight className="h-4 w-4" />
             </Button>
-            <Button href="/dashboard" variant="secondary" size="lg">
+            <Button variant="secondary" size="lg" onClick={() => setShowDemo(true)}>
               <Play className="h-4 w-4" />
               View Demo
             </Button>
@@ -68,6 +71,41 @@ export default function Hero() {
           <HolographicVisual />
         </motion.div>
       </div>
+
+      {/* ── DEMO MODAL ── */}
+      {showDemo && (
+        <div
+          onClick={() => setShowDemo(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 999,
+            background: "rgba(0,0,0,0.88)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 20,
+            backdropFilter: "blur(8px)",
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ width: "100%", maxWidth: 720, position: "relative" }}
+          >
+            <button
+              onClick={() => setShowDemo(false)}
+              style={{
+                position: "absolute", top: -44, right: 0,
+                background: "transparent",
+                border: "1px solid rgba(255,255,255,0.15)",
+                color: "rgba(255,255,255,0.6)",
+                padding: "6px 16px", borderRadius: 8,
+                cursor: "pointer", fontSize: "0.85rem",
+                display: "flex", alignItems: "center", gap: 6,
+              }}
+            >
+              <X size={14} /> Close
+            </button>
+            <DemoWidget />
+          </div>
+        </div>
+      )}
     </section>
   );
 }
