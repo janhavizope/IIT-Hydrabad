@@ -1,0 +1,17 @@
+[
+    {
+        "name": "InsecureBankv2.apk",
+        "size": 3462429,
+        "verdict": 0
+    },
+    {
+        "name": "runtime.apk",
+        "size": 6109153,
+        "verdict": 0
+    },
+    {
+        "name": "Simple-Calculator.apk",
+        "size": 7967937,
+        "verdict": 0
+    }
+]
