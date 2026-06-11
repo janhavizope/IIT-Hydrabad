@@ -62,4 +62,4 @@ def get_report(report_id: str, db: Session = Depends(get_db)):
     return {
         **(report.raw_report or {}),
           "ai_summary": str(ai_summary),
-    }
+    }

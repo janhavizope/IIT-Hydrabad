@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "APK Guardian",
+  "version": "1.0",
+
+  "permissions": [
+    "downloads",
+    "storage"
+  ],
+
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "action": {
+    "default_title": "APK Guardian",
+    "default_popup": "popup.html"
+  }
+}

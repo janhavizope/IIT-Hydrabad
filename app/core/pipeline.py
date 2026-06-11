@@ -18,7 +18,7 @@ class AnalysisPipeline:
         self.ioc_extractor = IOCExtractor()
         self.verdict_engine = FinalVerdictEngine()
 
-    def execute(self, file_bytes: bytes, apk_hash: str, apk_path: str) -> Dict[str, Any]:
+    def execute(self, file_bytes: bytes, apk_hash: str, apk_path: str, execution_context: str = "default") -> Dict[str, Any]:
         import logging
         import traceback
         logger = logging.getLogger(__name__)
@@ -101,7 +101,8 @@ class AnalysisPipeline:
                     apk_path=apk_path,
                     package_name=package_name,
                     activity=main_activity,
-                    duration=30
+                    duration=30,
+                    execution_context=execution_context
                 )
                 if runtime_res:
                     # Merge results to guarantee contract
