@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "APKThreatIQ — GenAI APK Threat Detection",
+  title: "APK Shield — GenAI APK Threat Detection",
   description:
     "Analyze fraudulent mobile applications using AI-driven reverse engineering, static analysis, dynamic analysis, and automated risk scoring.",
 };

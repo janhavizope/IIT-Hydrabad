@@ -117,7 +117,7 @@ export default function DemoWidget() {
       {/* ── Header ── */}
       <div className={styles.header}>
         <span className={styles.logo}>
-          <span className={styles.logoIcon}>🛡️</span> APKThreatIQ
+          <span className={styles.logoIcon}>🛡️</span> APK Shield
         </span>
         <span className={styles.badge}>Live Demo</span>
       </div>

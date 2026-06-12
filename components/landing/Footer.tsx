@@ -26,7 +26,7 @@ export default function Footer() {
           ))}
         </nav>
 
-        <p className="text-xs text-muted">© {new Date().getFullYear()} APKThreatIQ. All rights reserved.</p>
+        <p className="text-xs text-muted">© {new Date().getFullYear()} APK Shield. All rights reserved.</p>
       </div>
     </footer>
   );

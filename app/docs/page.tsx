@@ -4,7 +4,7 @@ const sections = [
   {
     id: "getting-started",
     title: "Getting started",
-    body: "Upload an APK via the dashboard or API. APKThreatIQ runs reverse engineering, static and dynamic analysis, then returns a risk score and GenAI report.",
+    body: "Upload an APK via the dashboard or API. APK Shield runs reverse engineering, static and dynamic analysis, then returns a risk score and GenAI report.",
   },
   {
     id: "api",
@@ -23,7 +23,7 @@ export default function DocsPage() {
     <AppShell>
       <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
         <p className="text-sm font-medium text-primary">Documentation</p>
-        <h1 className="mt-2 text-3xl font-semibold text-foreground">APKThreatIQ docs</h1>
+        <h1 className="mt-2 text-3xl font-semibold text-foreground">APK Shield docs</h1>
         <p className="mt-4 text-muted">Integration guides and platform reference.</p>
 
         <div className="mt-12 space-y-10">

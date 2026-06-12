@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>APK Guardian — Threat Detected</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0f1e; color: #e2e8f0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      width: 440px; min-height: 480px; overflow: hidden;
+    }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(239,68,68,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(239,68,68,0.03) 1px, transparent 1px);
+      background-size: 30px 30px; pointer-events: none;
+    }
+    .header { display: flex; align-items: center; gap: 10px; padding: 16px 20px 14px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .logo { width: 36px; height: 36px; background: linear-gradient(135deg, #0ea5e9, #06b6d4); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px; color: #fff; }
+    .brand-name { font-size: 14px; font-weight: 700; }
+    .brand-sub { font-size: 10px; color: #64748b; letter-spacing: 1.5px; text-transform: uppercase; }
+    .threat-banner { margin: 16px 20px 0; border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+    .threat-banner.malicious { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); }
+    .threat-banner.suspicious { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); }
+    .threat-icon-wrap { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .threat-banner.malicious .threat-icon-wrap { background: rgba(239,68,68,0.15); }
+    .threat-banner.suspicious .threat-icon-wrap { background: rgba(245,158,11,0.15); }
+    .threat-title { font-size: 15px; font-weight: 700; }
+    .threat-banner.malicious .threat-title { color: #f87171; }
+    .threat-banner.suspicious .threat-title { color: #fbbf24; }
+    .threat-subtitle { font-size: 11px; color: #64748b; margin-top: 2px; }
+    .verdict-badge { display: inline-block; margin: 12px 20px 0; padding: 3px 12px; border-radius: 999px; font-size: 10px; font-weight: 800; letter-spacing: 1.5px; }
+    .verdict-badge.malicious { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+    .verdict-badge.suspicious { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); }
+    .info-card { margin: 12px 20px 0; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; overflow: hidden; }
+    .info-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; font-size: 12px; }
+    .info-row:not(:last-child) { border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .info-key { color: #64748b; }
+    .info-val { color: #e2e8f0; font-weight: 600; max-width: 220px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .risk-bar { height: 4px; background: rgba(255,255,255,0.08); border-radius: 999px; margin: 6px 0 0; }
+    .risk-fill { height: 100%; border-radius: 999px; transition: width 0.8s ease; }
+    .risk-fill.high { background: linear-gradient(90deg, #f97316, #ef4444); }
+    .risk-fill.med { background: linear-gradient(90deg, #eab308, #f97316); }
+    .reasons-card { margin: 10px 20px 0; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 12px 14px; }
+    .reasons-title { font-size: 10px; font-weight: 700; color: #64748b; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
+    .reason-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #94a3b8; margin-bottom: 5px; }
+    .reason-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .reason-dot.malicious { background: #ef4444; }
+    .reason-dot.suspicious { background: #f59e0b; }
+    .caution { margin: 10px 20px 0; padding: 10px 14px; background: rgba(71,85,105,0.2); border-radius: 8px; font-size: 11px; color: #94a3b8; font-style: italic; }
+    .actions { display: flex; gap: 10px; margin: 14px 20px 20px; }
+    .btn { flex: 1; padding: 11px 0; border-radius: 10px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .btn-download { background: rgba(255,255,255,0.07); color: #94a3b8; border: 1px solid rgba(255,255,255,0.1); }
+    .btn-download:hover { background: rgba(255,255,255,0.11); color: #e2e8f0; }
+    .btn-cancel { background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
+    .btn-cancel:hover { background: rgba(239,68,68,0.2); }
+    .btn-cancel-suspicious { background: rgba(245,158,11,0.12); color: #fbbf24; border: 1px solid rgba(245,158,11,0.25); }
+    .btn-cancel-suspicious:hover { background: rgba(245,158,11,0.2); }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">AG</div>
+    <div>
+      <div class="brand-name">APK <span style="color:#00d4ff">Guardian</span></div>
+      <div class="brand-sub">Security Scanner</div>
+    </div>
+  </div>
+
+  <div id="threatBanner" class="threat-banner suspicious">
+    <div class="threat-icon-wrap">
+      <svg id="threatIcon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+    </div>
+    <div>
+      <div class="threat-title" id="threatTitle">Suspicious File</div>
+      <div class="threat-subtitle" id="threatSub">Download paused for review</div>
+    </div>
+  </div>
+
+  <div id="verdictBadge" class="verdict-badge suspicious">SUSPICIOUS</div>
+
+  <div class="info-card">
+    <div class="info-row">
+      <span class="info-key">File</span>
+      <span class="info-val" id="infoFile">—</span>
+    </div>
+    <div class="info-row" style="flex-direction:column; align-items:flex-start; gap:6px">
+      <div style="display:flex; justify-content:space-between; width:100%">
+        <span class="info-key">Risk Score</span>
+        <span class="info-val" id="infoScore">— / 100</span>
+      </div>
+      <div class="risk-bar" style="width:100%">
+        <div class="risk-fill high" id="riskFill" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="reasons-card">
+    <div class="reasons-title">Reasons Flagged</div>
+    <div id="reasonsList"></div>
+  </div>
+
+  <div class="caution" id="cautionText">Proceed only if you fully trust the source.</div>
+
+  <div class="actions">
+    <button class="btn btn-download" id="btnDownload">Download Anyway</button>
+    <button class="btn btn-cancel" id="btnCancel">Cancel Download</button>
+  </div>
+
+  <script src="alert.js"></script>
+</body>
+</html>

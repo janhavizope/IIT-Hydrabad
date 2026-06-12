@@ -1,19 +1,29 @@
 {
   "manifest_version": 3,
   "name": "APK Guardian",
-  "version": "1.0",
-
+  "version": "2.0",
+  "description": "Intercepts downloads and scans for threats before allowing download.",
   "permissions": [
+    "declarativeNetRequest",
     "downloads",
-    "storage"
+    "storage",
+    "tabs",
+    "webRequest",
+    "notifications"
   ],
-
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "background": {
     "service_worker": "background.js"
   },
-
   "action": {
-    "default_title": "APK Guardian",
     "default_popup": "popup.html"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["scanning.html", "alert.html"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }

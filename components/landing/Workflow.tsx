@@ -37,7 +37,7 @@ export default function Workflow() {
         <SectionReveal className="text-center">
           <p className="text-sm font-medium uppercase tracking-[0.2em] text-primary">Process</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-            How APKThreatIQ Works
+            How APK Shield Works
           </h2>
         </SectionReveal>
 

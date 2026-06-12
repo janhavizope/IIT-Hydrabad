@@ -1,0 +1,203 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  width: 340px;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: #0f172a;
+  color: #f1f5f9;
+}
+
+/* Header */
+.header {
+  background: #0f172a;
+  padding: 13px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 0.5px solid #1e293b;
+}
+
+.logo {
+  width: 36px;
+  height: 36px;
+  background: #4f46e5;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.subtitle {
+  font-size: 10px;
+  color: #6366f1;
+}
+
+.upload-btn {
+  background: #4f46e5;
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.upload-btn:hover { background: #4338ca; }
+
+/* Stats bar */
+.stats-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 0.5px solid #1e293b;
+}
+
+.stat-item {
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.stat-num {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.stat-num.safe       { color: #4ade80; }
+.stat-num.suspicious { color: #fb923c; }
+.stat-num.malware    { color: #f87171; }
+
+.stat-label {
+  font-size: 10px;
+  color: #475569;
+  font-weight: 500;
+}
+
+/* List */
+.list-section {
+  padding: 10px 12px;
+}
+
+.section-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+
+#reports-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+#reports-list::-webkit-scrollbar { width: 4px; }
+#reports-list::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+
+.placeholder {
+  font-size: 12px;
+  color: #475569;
+  text-align: center;
+  padding: 20px 0;
+}
+
+/* Report card */
+.report-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #1e293b;
+  border: 0.5px solid #263348;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.report-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 15px;
+}
+
+.report-icon.SAFE       { background: #14532d; color: #4ade80; }
+.report-icon.SUSPICIOUS { background: #431407; color: #fb923c; }
+.report-icon.MALWARE    { background: #450a0a; color: #f87171; }
+.report-icon.UNKNOWN,
+.report-icon.PENDING    { background: #1e293b; color: #64748b; }
+
+.report-info { flex: 1; overflow: hidden; }
+
+.report-filename {
+  font-size: 12px;
+  font-weight: 600;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.report-meta {
+  font-size: 10px;
+  color: #475569;
+  margin-top: 1px;
+}
+
+.verdict-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.verdict-badge.SAFE       { border: 0.5px solid #166534; color: #4ade80; }
+.verdict-badge.SUSPICIOUS { border: 0.5px solid #7c2d12; color: #fb923c; }
+.verdict-badge.MALWARE    { border: 0.5px solid #7f1d1d; color: #f87171; }
+.verdict-badge.UNKNOWN,
+.verdict-badge.PENDING    { border: 0.5px solid #334155; color: #64748b; }
+
+/* Footer */
+.footer {
+  padding: 8px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#upload-status {
+  font-size: 11px;
+  text-align: center;
+  min-height: 16px;
+  color: #4ade80;
+}
+
+.refresh-btn {
+  width: 100%;
+  background: #1e293b;
+  color: #64748b;
+  border: 0.5px solid #263348;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.refresh-btn:hover { background: #263348; color: #94a3b8; }

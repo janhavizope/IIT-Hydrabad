@@ -1,5 +1,5 @@
 export const BRAND = {
-  name: "APKThreatIQ",
+  name: "APK Shield",
   tagline: "GenAI-powered APK threat intelligence",
 } as const;
 

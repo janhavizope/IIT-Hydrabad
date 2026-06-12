@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>APK Guardian — Scanning</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0f1e;
+      color: #e2e8f0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      width: 420px;
+      min-height: 520px;
+      overflow: hidden;
+      position: relative;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+      background-size: 30px 30px;
+      pointer-events: none;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid rgba(0,212,255,0.12);
+    }
+    .logo {
+      width: 38px; height: 38px;
+      background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 13px; color: #fff;
+    }
+    .brand-name { font-size: 15px; font-weight: 700; color: #e2e8f0; }
+    .brand-sub { font-size: 10px; color: #64748b; letter-spacing: 1.5px; text-transform: uppercase; }
+    .scan-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 28px 24px 20px;
+    }
+    .orbit-wrapper {
+      position: relative;
+      width: 120px; height: 120px;
+      margin-bottom: 20px;
+    }
+    .orbit-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2px solid transparent;
+    }
+    .orbit-ring.outer {
+      border-top-color: #00d4ff;
+      border-right-color: rgba(0,212,255,0.3);
+      animation: spin 1.4s linear infinite;
+    }
+    .orbit-ring.inner {
+      inset: 14px;
+      border-bottom-color: #06b6d4;
+      border-left-color: rgba(6,182,212,0.3);
+      animation: spin 1.0s linear infinite reverse;
+    }
+    .shield-core {
+      position: absolute;
+      inset: 26px;
+      background: rgba(0,212,255,0.08);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      border: 1px solid rgba(0,212,255,0.2);
+    }
+    .shield-icon { width: 32px; height: 32px; color: #00d4ff; }
+    .pulse-ring {
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      border: 1px solid rgba(0,212,255,0.4);
+      animation: pulse-out 2s ease-out infinite;
+    }
+    .pulse-ring:nth-child(2) { animation-delay: 0.7s; }
+    @keyframes pulse-out {
+      0% { transform: scale(1); opacity: 0.6; }
+      100% { transform: scale(1.5); opacity: 0; }
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .orbit-wrapper.safe .orbit-ring { animation: none; border-color: transparent; }
+    .orbit-wrapper.safe .orbit-ring.outer { border-color: #22c55e; animation: none; }
+    .orbit-wrapper.safe .shield-core { background: rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.3); }
+    .orbit-wrapper.safe .shield-icon { color: #22c55e; }
+    .status-label {
+      font-size: 18px; font-weight: 700; color: #00d4ff;
+      margin-bottom: 6px; transition: all 0.4s;
+    }
+    .status-label.safe { color: #22c55e; }
+    .status-sub {
+      font-size: 12px; color: #64748b;
+      text-align: center; max-width: 260px; line-height: 1.5;
+    }
+    .file-chip {
+      margin: 0 20px 20px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .file-icon {
+      width: 32px; height: 32px;
+      background: rgba(0,212,255,0.1);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .file-name { font-size: 13px; font-weight: 600; color: #e2e8f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-url { font-size: 10px; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .steps { margin: 0 20px; display: flex; flex-direction: column; }
+    .step {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 10px 0; position: relative;
+    }
+    .step:not(:last-child)::after {
+      content: ''; position: absolute;
+      left: 11px; top: 34px; bottom: -2px;
+      width: 1px; background: rgba(255,255,255,0.08);
+    }
+    .step.done:not(:last-child)::after { background: rgba(0,212,255,0.3); }
+    .step-dot {
+      width: 22px; height: 22px; border-radius: 50%;
+      border: 2px solid #1e293b; background: #1e293b;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: all 0.4s; margin-top: 1px;
+    }
+    .step.done .step-dot { background: #00d4ff; border-color: #00d4ff; }
+    .step.active .step-dot { background: transparent; border-color: #00d4ff; animation: dot-pulse 1s ease-in-out infinite; }
+    .step.safe-done .step-dot { background: #22c55e; border-color: #22c55e; }
+    @keyframes dot-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(0,212,255,0.5); }
+      50% { box-shadow: 0 0 0 5px rgba(0,212,255,0); }
+    }
+    .step-check { width: 10px; height: 10px; color: #0a0f1e; display: none; }
+    .step.done .step-check { display: block; }
+    .step.active .step-dot::after {
+      content: ''; width: 7px; height: 7px;
+      border-radius: 50%; background: #00d4ff; display: block;
+    }
+    .step-info { flex: 1; }
+    .step-title { font-size: 13px; font-weight: 600; color: #94a3b8; transition: color 0.3s; }
+    .step.done .step-title, .step.active .step-title { color: #e2e8f0; }
+    .step-desc { font-size: 11px; color: #475569; margin-top: 1px; }
+    .step-badge {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+      padding: 2px 8px; border-radius: 999px;
+      background: rgba(0,212,255,0.12); color: #00d4ff; display: none;
+    }
+    .step.active .step-badge { display: block; }
+    .step.done .step-badge { display: none; }
+    .all-clear {
+      margin: 16px 20px 0; padding: 12px 16px;
+      background: rgba(34,197,94,0.08);
+      border: 1px solid rgba(34,197,94,0.25);
+      border-radius: 10px;
+      display: flex; align-items: center; gap: 10px;
+      opacity: 0; transform: translateY(6px); transition: all 0.5s;
+    }
+    .all-clear.show { opacity: 1; transform: translateY(0); }
+    .all-clear-icon { color: #22c55e; flex-shrink: 0; }
+    .all-clear-text { font-size: 12px; color: #86efac; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">AG</div>
+    <div>
+      <div class="brand-name">APK <span style="color:#00d4ff">Guardian</span></div>
+      <div class="brand-sub">Security Scanner</div>
+    </div>
+  </div>
+
+  <div class="scan-center">
+    <div class="orbit-wrapper" id="orbitWrapper">
+      <div class="pulse-ring"></div>
+      <div class="pulse-ring"></div>
+      <div class="orbit-ring outer"></div>
+      <div class="orbit-ring inner"></div>
+      <div class="shield-core">
+        <svg class="shield-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </div>
+    </div>
+    <div class="status-label" id="statusLabel">Scanning...</div>
+    <div class="status-sub" id="statusSub">Analyzing file for threats</div>
+  </div>
+
+  <div class="file-chip">
+    <div class="file-icon">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+    </div>
+    <div style="overflow:hidden; flex:1">
+      <div class="file-name" id="fileName">Scanning...</div>
+      <div class="file-url" id="fileUrl">Intercepted download</div>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step active" id="step-intercepted">
+      <div class="step-dot">
+        <svg class="step-check" viewBox="0 0 10 10"><polyline points="1,5 4,8 9,2" stroke="#0a0f1e" stroke-width="2" fill="none"/></svg>
+      </div>
+      <div class="step-info">
+        <div class="step-title">Intercepted</div>
+        <div class="step-desc">Download captured</div>
+      </div>
+      <div class="step-badge">LIVE</div>
+    </div>
+    <div class="step" id="step-contacting">
+      <div class="step-dot">
+        <svg class="step-check" viewBox="0 0 10 10"><polyline points="1,5 4,8 9,2" stroke="#0a0f1e" stroke-width="2" fill="none"/></svg>
+      </div>
+      <div class="step-info">
+        <div class="step-title">Contacting backend</div>
+        <div class="step-desc">Sending to scanner</div>
+      </div>
+      <div class="step-badge">LIVE</div>
+    </div>
+    <div class="step" id="step-analyzing">
+      <div class="step-dot">
+        <svg class="step-check" viewBox="0 0 10 10"><polyline points="1,5 4,8 9,2" stroke="#0a0f1e" stroke-width="2" fill="none"/></svg>
+      </div>
+      <div class="step-info">
+        <div class="step-title">Analyzing threats</div>
+        <div class="step-desc">Static + dynamic scan</div>
+      </div>
+      <div class="step-badge">LIVE</div>
+    </div>
+    <div class="step" id="step-verdict">
+      <div class="step-dot">
+        <svg class="step-check" viewBox="0 0 10 10"><polyline points="1,5 4,8 9,2" stroke="#0a0f1e" stroke-width="2" fill="none"/></svg>
+      </div>
+      <div class="step-info">
+        <div class="step-title">Verdict</div>
+        <div class="step-desc">Final result</div>
+      </div>
+      <div class="step-badge">LIVE</div>
+    </div>
+  </div>
+
+  <div class="all-clear" id="allClear">
+    <svg class="all-clear-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+    <div class="all-clear-text">All security checks passed — download resuming automatically</div>
+  </div>
+
+  <script src="scanning.js"></script>
+</body>
+</html>
